@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.4
+
+- Fix bug where `:exit_status` was not a valid option for `use Credo.Check`
+- Fix bug where `mix credo diff` exited with a non-zero exit status even if no issues were shown
+- `mix credo diff` now fails with an error if the given `ref` was not found
+
+## 1.5.3
+
+- Fix bug in `diff` and `version` command when `git` is not installed
+
+## 1.5.2
+
+- Fix output bug in `diff` command
+- Fix bug in `diff` command when run on a Git ref that does not contain a given `--config-name`
+- Fix bug in all commands when a given `--config-name` is not found
+- Fix false positive in `Credo.Check.Warning.ExpensiveEmptyEnumCheck`
+- Fix false positive in `Credo.Check.Refactor.PipeChainStart` regarding custom operators
+- Fix `--version` to include pre version and build info for unpublished versions (e.g. when the dep is included via `path:` or `github:`)
+
 ## 1.5.1
 
 - Fix bug in `diff` command when run on a subdirectory of a Git repository

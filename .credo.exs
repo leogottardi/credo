@@ -141,6 +141,8 @@
         {Credo.Check.Warning.OperationOnSameValues, []},
         {Credo.Check.Warning.OperationWithConstantResult, []},
         {Credo.Check.Warning.RaiseInsideRescue, []},
+        {Credo.Check.Warning.SpecWithStruct, []},
+        {Credo.Check.Warning.WrongTestFileExtension, []},
         {Credo.Check.Warning.UnusedEnumOperation, []},
         {Credo.Check.Warning.UnusedFileOperation, []},
         {Credo.Check.Warning.UnusedKeywordOperation, []},
@@ -159,6 +161,7 @@
         #
         {Credo.Check.Consistency.MultiAliasImportRequireUse, false},
         {Credo.Check.Consistency.UnusedVariableNames, false},
+        {Credo.Check.Design.SkipTestWithoutComment, false},
         {Credo.Check.Design.DuplicatedCode, false},
         {Credo.Check.Readability.AliasAs, false},
         {Credo.Check.Readability.BlockPipe, false},

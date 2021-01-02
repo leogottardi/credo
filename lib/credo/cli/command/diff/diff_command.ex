@@ -6,6 +6,7 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
   @shortdoc "Suggest code objects to look at next (based on git-diff)"
 
   alias Credo.CLI.Command.Diff.DiffOutput
+  alias Credo.CLI.Output.UI
   alias Credo.CLI.Task
   alias Credo.Execution
 
@@ -31,6 +32,9 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
       ],
       print_after_analysis: [
         {__MODULE__.PrintResultsAndSummary, []}
+      ],
+      filter_issues_for_exit_status: [
+        {__MODULE__.FilterIssuesForExitStatus, []}
       ]
     )
   end
@@ -41,16 +45,24 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
   def previous_ref(exec) do
     given_first_arg = List.first(exec.cli_options.args)
 
+    previous_ref_as_git_ref(given_first_arg) ||
+      previous_ref_as_path(given_first_arg) ||
+      {:error, "given ref is not a Git ref or local path: #{given_first_arg}"}
+  end
+
+  def previous_ref_as_git_ref(given_first_arg) do
     if git_present?() do
       potential_git_ref = given_first_arg || "HEAD"
 
       if git_ref_exists?(potential_git_ref) do
         {:git, potential_git_ref}
-      else
-        {:path, potential_git_ref}
       end
-    else
-      # no git?
+    end
+  end
+
+  def previous_ref_as_path(potential_path) do
+    if File.exists?(potential_path) do
+      {:path, potential_path}
     end
   end
 
@@ -59,6 +71,8 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
       {_output, 0} -> true
       {_output, _} -> false
     end
+  rescue
+    _ -> false
   end
 
   defp git_ref_exists?(git_ref) do
@@ -81,10 +95,24 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
       end
     end
 
+    def error(exec, _opts) do
+      exec
+      |> Execution.get_halt_message()
+      |> puts_error_message()
+
+      exec
+    end
+
+    defp puts_error_message(halt_message) do
+      UI.warn([:red, "** (diff) ", halt_message])
+      UI.warn("")
+    end
+
     def run_credo_and_store_resulting_execution(exec) do
       case DiffCommand.previous_ref(exec) do
         {:git, git_ref} -> run_credo_on_git_ref(exec, git_ref)
         {:path, path} -> run_credo_on_path_ref(exec, path)
+        {:error, error} -> Execution.halt(exec, error)
       end
     end
 
@@ -132,10 +160,32 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
     end
 
     defp store_resulting_execution(exec, previous_git_ref, previous_dirname, previous_exec) do
-      exec
-      |> Execution.put_assign("credo.diff.previous_git_ref", previous_git_ref)
-      |> Execution.put_assign("credo.diff.previous_dirname", previous_dirname)
-      |> Execution.put_assign("credo.diff.previous_exec", previous_exec)
+      if previous_exec.halted do
+        halt_execution(exec, previous_git_ref, previous_dirname, previous_exec)
+      else
+        exec
+        |> Execution.put_assign("credo.diff.previous_git_ref", previous_git_ref)
+        |> Execution.put_assign("credo.diff.previous_dirname", previous_dirname)
+        |> Execution.put_assign("credo.diff.previous_exec", previous_exec)
+      end
+    end
+
+    defp halt_execution(exec, previous_git_ref, previous_dirname, previous_exec) do
+      message =
+        case Execution.get_halt_message(previous_exec) do
+          {:config_name_not_found, message} -> message
+          halt_message -> inspect(halt_message)
+        end
+
+      Execution.halt(
+        exec,
+        [
+          :bright,
+          "Running Credo on `#{previous_git_ref}` (checked out to #{previous_dirname}) resulted in the following error:\n\n",
+          :faint,
+          message
+        ]
+      )
     end
 
     defp run_git_clone_and_checkout(path, git_ref) do
@@ -260,6 +310,24 @@ defmodule Credo.CLI.Command.Diff.DiffCommand do
       DiffOutput.print_after_info(source_files, exec, time_load, time_run)
 
       exec
+    end
+  end
+
+  defmodule FilterIssuesForExitStatus do
+    @moduledoc false
+
+    use Credo.Execution.Task
+
+    def call(exec, _opts) do
+      issues =
+        exec
+        |> Execution.get_issues()
+        |> Enum.filter(fn
+          %Credo.Issue{diff_marker: :new} -> true
+          _ -> false
+        end)
+
+      Execution.set_issues(exec, issues)
     end
   end
 end
